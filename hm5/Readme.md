@@ -35,66 +35,20 @@ CPU times: user 0.190 s, sys 0.004 s, total 0.194 sWall time: 3.034 s
 
 ### Python
 
-13 partitions: 
-
-CPU times: user 72.6 ms, sys: 30 ms, total: 103 ms
-Wall time: 2min 7s
-200 partitions: 
-
-CPU times: user 137 ms, sys: 57.4 ms, total: 195 ms
-Wall time: 1min 33s
-
-50 partitions: 
-
-CPU times: user 115 ms, sys: 40 ms, total: 155 ms
-Wall time: 1min 45s
-100 partitions: 
-
-CPU times: user 147 ms, sys: 30.7 ms, total: 178 ms
-Wall time: 1min 30s
-
-500 partitions:
-CPU times: user 183 ms, sys: 54.6 ms, total: 238 ms
-Wall time: 1min 33s
+| Количество партиций | CPU time (user) | CPU time (sys) | CPU time (total) | Wall time |
+| :------------------ | :-------------- | :------------- | :--------------- | :-------- |
+| 13                  | 72.6 ms         | 30 ms          | 103 ms           | 2min 7s   |
+| 50                  | 115 ms          | 40 ms          | 155 ms           | 1min 45s  |
+| 100                 | 147 ms          | 30.7 ms        | 178 ms           | 1min 30s  |
+| 200                 | 137 ms          | 57.4 ms        | 195 ms           | 1min 33s  |
+| 500                 | 183 ms          | 54.6 ms        | 238 ms           | 1min 33s  |
 
 ### Java
 
-13 partitions:
-
-CPU times: 
-
-user 0.040 s, sys 0.003 s, total 0.043 s
-
-Wall time: 105.014 s
-
-200 partitions: 
-
-CPU times: 
-
-user 0.030 s, sys 0.002 s, total 0.032 s
-
-Wall time: 64.836 s
-
-50 partitions: 
-
-CPU times: 
-
-user 0.020 s, sys 0.003 s, total 0.023 s
-
-Wall time: 95.121 s
-
-100 partitions: 
-
-CPU times: 
-
-user 0.010 s, sys 0.010 s, total 0.020 s
-
-Wall time: 84.547 s
-
-500 partitions: 
-
-CPU times:
-
-user 0.040 s, sys -0.002 s, total 0.038 s
-
-Wall time: 97.721 s
+| Количество партиций | CPU time (user) | CPU time (sys) | CPU time (total) | Wall time   |
+| :------------------ | :-------------- | :------------- | :--------------- | :---------- |
+| 13                  | 0.040 s         | 0.003 s        | 0.043 s          | 105.014 s   |
+| 50                  | 0.020 s         | 0.003 s        | 0.023 s          | 95.121 s    |
+| 100                 | 0.010 s         | 0.010 s        | 0.020 s          | 84.547 s    |
+| 200                 | 0.030 s         | 0.002 s        | 0.032 s          | 64.836 s    |
+| 500                 | 0.040 s         | -0.002 s*      | 0.038 s          | 97.721 s    |
