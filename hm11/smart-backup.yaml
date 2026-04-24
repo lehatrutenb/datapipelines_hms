@@ -1,0 +1,109 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: smart-backup
+  namespace: argo-workflows
+spec:
+  arguments:
+    parameters:
+    - name: namespace
+      value: "default"
+    - name: resource-types
+      value: "deployment,configmap,secret"
+    - name: change-trigger
+      value: "manual"
+  
+  entrypoint: backup-pipeline
+  
+  templates:
+  - name: backup-pipeline
+    steps:
+    - - name: create-backup
+        template: backup-resources
+        arguments:
+          parameters:
+          - name: namespace
+            value: "{{workflow.parameters.namespace}}"
+          - name: resource-types
+            value: "{{workflow.parameters.resource-types}}"
+          - name: trigger
+            value: "{{workflow.parameters.change-trigger}}"
+    
+    - - name: show-results
+        template: display-summary
+        arguments:
+          parameters:
+          - name: backup-id
+            value: "{{steps.create-backup.outputs.parameters.backup-id}}"
+          - name: total-count
+            value: "{{steps.create-backup.outputs.parameters.total-count}}"
+  
+  - name: backup-resources
+    inputs:
+      parameters:
+      - name: namespace
+      - name: resource-types
+      - name: trigger
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      source: |
+        BACKUP_ID="backup-{{inputs.parameters.namespace}}-$(date +%Y%m%d-%H%M%S)"
+        BACKUP_DIR="/tmp/${BACKUP_ID}"
+        mkdir -p "$BACKUP_DIR"
+        
+        echo "Backup ID: ${BACKUP_ID}"
+        TOTAL_COUNT=0
+        
+        IFS=',' read -ra TYPES <<< "{{inputs.parameters.resource-types}}"
+        
+        for type in "${TYPES[@]}"; do
+          RESOURCES=$(kubectl get "$type" -n {{inputs.parameters.namespace}} --no-headers 2>/dev/null || true)
+          
+          if [ -n "$RESOURCES" ]; then
+            COUNT=$(echo "$RESOURCES" | wc -l | tr -d ' ')
+            kubectl get "$type" -n {{inputs.parameters.namespace}} -o yaml > "${BACKUP_DIR}/${type}.yaml"
+            echo "  ✅ $type: $COUNT resources saved"
+            TOTAL_COUNT=$((TOTAL_COUNT + COUNT))
+          else
+            echo "  ⚠️  $type: no resources found"
+          fi
+        done
+        
+        # Сохраняем всё в один архив
+        cd /tmp
+        tar czf backup.tar.gz "${BACKUP_ID}"
+        
+        echo "$BACKUP_ID" > /tmp/backup-id.txt
+        echo "$TOTAL_COUNT" > /tmp/total-count.txt
+        echo "Backup size: $(du -h backup.tar.gz | cut -f1)" > /tmp/backup-size.txt
+        kubectl create configmap ${BACKUP_ID} \
+        --from-file=backup.tar.gz=/tmp/backup.tar.gz \
+        -n argo-workflows
+    outputs:
+      parameters:
+      - name: backup-id
+        valueFrom:
+          path: /tmp/backup-id.txt
+      - name: total-count
+        valueFrom:
+          path: /tmp/total-count.txt
+      - name: backup-size
+        valueFrom:
+          path: /tmp/backup-size.txt
+  
+  - name: display-summary
+    inputs:
+      parameters:
+      - name: backup-id
+      - name: total-count
+    script:
+      image: alpine:latest
+      command: [sh]
+      source: |
+        echo "========================================="
+        echo "📊 BACKUP SUMMARY"
+        echo "========================================="
+        echo "Backup ID:       {{inputs.parameters.backup-id}}"
+        echo "Total Resources: {{inputs.parameters.total-count}}"
+        echo "========================================="
