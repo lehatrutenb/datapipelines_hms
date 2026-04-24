@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: smart-backup-hourly
+  namespace: argo-workflows
+spec:
+  schedule: "0 * * * *"
+  timezone: "Europe/Moscow"
+  concurrencyPolicy: "Replace"
+  startingDeadlineSeconds: 60
+  workflowSpec:
+    workflowTemplateRef:
+      name: smart-backup
+    arguments:
+      parameters:
+      - name: namespace
+        value: "default"
+      - name: resource-types
+        value: "deployment,configmap,secret"
+      - name: change-trigger
+        value: "scheduled"
