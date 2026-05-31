@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-scripts-memory
+  namespace: spark
+data:
+  jmx_config.yaml: |
+    lowercaseOutputName: true
+    attrNameSnakeCase: true
+    rules:
+      - pattern: 'metrics<name=(\S+)\.(\S+)\.(\S+)\.executor\.(.+), type=gauges><>Value'
+        name: spark_executor_$4
+        type: GAUGE
+        labels:
+          app_namespace: "$1"
+          app_id: "$2"
+          executor_id: "$3"
+      - pattern: 'metrics<name=(\S+)\.(\S+)\.(\S+)\.executor\.(.+), type=counters><>Count'
+        name: spark_executor_$4
+        type: COUNTER
+        labels:
+          app_namespace: "$1"
+          app_id: "$2"
+          executor_id: "$3"
+      - pattern: 'metrics<name=(\S+)\.(\S+)\.([0-9]+)\.jvm\.(.+), type=gauges><>Value'
+        name: spark_executor_jvm_$4
+        type: GAUGE
+        labels:
+          app_namespace: "$1"
+          app_id: "$2"
+          executor_id: "$3"
+      - pattern: 'metrics<name=(\S+)\.(\S+)\.driver\.DAGScheduler\.(stage|job)\.(.+), type=gauges><>Value'
+        name: spark_driver_dagscheduler_$3_$4
+        type: GAUGE
+        labels:
+          app_namespace: "$1"
+          app_id: "$2"
+      - pattern: 'metrics<name=(\S+)\.(\S+)\.driver\.DAGScheduler\.(.+), type=timers><>Count'
+        name: spark_driver_dagscheduler_$3_count
+        type: COUNTER
+        labels:
+          app_namespace: "$1"
+          app_id: "$2"
+      - pattern: 'metrics<name=(\S+)\.(\S+)\.driver\.jvm\.(.+), type=gauges><>Value'
+        name: spark_driver_jvm_$3
+        type: GAUGE
+        labels:
+          app_namespace: "$1"
+          app_id: "$2"
+
+  memory_job.py: |
+    from pyspark.sql import SparkSession
+    from pyspark.sql import functions as F
+    import time
+
+
+    spark = (
+        SparkSession.builder.appName("memory-job")
+        .config("spark.sql.shuffle.partitions", "8")
+        .config("spark.memory.fraction", "0.6")
+        .config("spark.memory.storageFraction", "0.9")
+        .getOrCreate()
+    )
+    sc = spark.sparkContext
+    sc.setLogLevel("WARN")
+
+    cycle = 0
+    while True:
+        if cycle % 2 == 0:
+            df = spark.range(10_000).withColumn("v", F.col("id") % 100)
+            df.groupBy("v").count().orderBy("v").count()
+            df.withColumn("v2", F.col("v") * 2).groupBy("v2").agg(F.sum("v")).count()
+            df.withColumn("r", F.monotonically_increasing_id() % 10).groupBy("r").count().count()
+        else:
+            df = (
+                spark.range(50_000_000)
+                .withColumn("k", F.col("id") % 200)
+                .withColumn("v", F.col("id").cast("string"))
+                .withColumn("w", F.col("id") % 50)
+            )
+            df.repartition(4).groupBy("k").agg(F.max("v"), F.count("*")).orderBy("k").count()
+            df.repartition(4).sortWithinPartitions("k", "w").count()
+            df.repartition(4).groupBy("w").agg(F.sum(F.length("v")), F.countDistinct("k")).count()
+        cycle += 1
+        time.sleep(10)

@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - spark/namespace.yaml
+  - monitoring/namespace.yaml
+
+  - monitoring/prometheus/rbac.yaml
+  - monitoring/prometheus/configmap.yaml
+  - monitoring/prometheus/deployment.yaml
+  - monitoring/prometheus/service.yaml
+
+  - monitoring/grafana/rbac.yaml
+  - monitoring/grafana/configmap-datasource.yaml
+  - monitoring/grafana/configmap-dashboards.yaml
+  - monitoring/grafana/configmap-executor-overview.yaml
+  - monitoring/grafana/configmap-jobs-health.yaml
+  - monitoring/grafana/configmap-jvm-gc.yaml
+  - monitoring/grafana/deployment.yaml
+  - monitoring/grafana/service.yaml
+
+  - spark/configmap-unstable.yaml
+  - spark/configmap-memory.yaml
+  - spark/unstable-job.yaml
+  - spark/memory-job.yaml
