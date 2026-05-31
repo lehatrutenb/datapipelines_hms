@@ -1,0 +1,285 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio-server
+    ports:
+      - "9000:9000"  # API port
+      - "9001:9001"  # Console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - ./minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mc:
+    image: minio/mc:latest
+    container_name: minio-client
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set myminio http://minio:9000 minioadmin minioadmin123;
+      mc mb myminio/benchmark --ignore-existing;
+      mc policy set public myminio/benchmark;
+      echo 'Benchmark bucket created!';
+      tail -f /dev/null
+      "
+
+  # notebook-java:
+  #   build:
+  #     context: .
+  #   container_name: notebook-java
+  #   ports:
+  #     - "8889:8888" # notebook
+  #   volumes:
+  #     - ../hm6:/workspace
+  #   networks:
+  #     - notebook-java-network
+  
+  notebook-python:
+    build:
+      context: .
+    container_name: notebook-python
+    ports:
+      - "8888:8888" # notebook
+      - "4040:4040" # notebook
+    volumes:
+      - ../hm6:/workspace
+  #  networks:
+  #    - notebook-python-network
+
+  # spark-package-downloader:
+  #   build:
+  #     context: .
+  #   volumes:
+  #     - spark-packages:/opt/spark/packages
+  #   environment:
+  #     - SPARK_PACKAGES=org.apache.spark:spark-core_2.12:3.5.3,org.apache.spark:spark-sql_2.12:3.5.3
+  #   command: >
+  #     /bin/bash -c "
+  #       /opt/spark/bin/spark-shell --packages org.apache.spark:spark-core_2.12:3.5.3,org.apache.spark:spark-sql_2.12:3.5.3 --conf spark.jars.ivy=/tmp/ivy2 -i /dev/null <<< ':quit' &&
+  #       cp /tmp/ivy2/jars/*.jar /opt/spark/packages/ 2>/dev/null || true
+  #    "
+
+  spark-master:
+    build:
+      context: .
+    # depends_on:
+    #   spark-package-downloader:
+    #     condition: service_completed_successfully
+    container_name: spark-master
+    ports:
+      - "8080:8080"  # spark UI
+      - "7077:7077"  # spark master
+    volumes:
+      - ../hm6:/workspace
+      # - spark-packages:/opt/spark/packages
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      # - SPARK_PACKAGES=org.apache.spark:spark-core_2.12:3.5.3,org.apache.spark:spark-sql_2.12:3.5.3
+      # - SPARK_EXTRA_CLASSPATH=/opt/spark/packages/*
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+
+  spark-worker-1:
+    build:
+      context: .
+    container_name: spark-worker1
+    depends_on:
+      spark-master:
+        condition: service_started
+      # spark-package-downloader:
+      #   condition: service_completed_successfully
+    ports:
+      - "8081:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+      # - spark-packages:/opt/spark/packages
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      # - SPARK_PACKAGES=org.apache.spark:spark-core_2.12:3.5.3,org.apache.spark:spark-sql_2.12:3.5.3
+      # - SPARK_EXTRA_CLASSPATH=/opt/spark/packages/*
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  
+  spark-worker-2:
+    build:
+      context: .
+    container_name: spark-worker2
+    depends_on:
+      spark-master:
+        condition: service_started
+    ports:
+      - "8082:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  
+  spark-worker-3:
+    build:
+      context: .
+    container_name: spark-worker3
+    depends_on:
+      spark-master:
+        condition: service_started
+    ports:
+      - "8083:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  
+  spark-worker-4:
+    build:
+      context: .
+    container_name: spark-worker4
+    depends_on:
+      spark-master:
+        condition: service_started
+    ports:
+      - "8084:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  
+  spark-worker-5:
+    build:
+      context: .
+    container_name: spark-worker5
+    depends_on:
+      spark-master:
+        condition: service_started
+    ports:
+      - "8085:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  
+  spark-worker-6:
+    build:
+      context: .
+    container_name: spark-worker6
+    depends_on:
+      spark-master:
+        condition: service_started
+    ports:
+      - "8086:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  
+  spark-worker-7:
+    build:
+      context: .
+    container_name: spark-worker7
+    depends_on:
+      spark-master:
+        condition: service_started
+    ports:
+      - "8087:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  
+  spark-worker-8:
+    build:
+      context: .
+    container_name: spark-worker8
+    depends_on:
+      spark-master:
+        condition: service_started
+    ports:
+      - "8088:8081"  # spark UI
+    volumes:
+      - ../hm6:/workspace
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+
+# volumes:
+#   spark-packages:
+
+networks:
+  notebook-java-network:
+    driver: bridge
+  notebook-python-network:
+    driver: bridge
